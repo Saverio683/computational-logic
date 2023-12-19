@@ -230,3 +230,24 @@ class Proposition:
             if self.__evaluate_model__(model) != other_proposition.__evaluate_model__(model):
                 return False
         return True
+    
+    def print_tree(self, node: Optional['Proposition'] = None, indent: int = 0):
+        c = 3
+        if not node:
+            print()
+            print(self.root)
+            if self.left:
+                self.print_tree(self.left)
+            if self.right:
+                self.print_tree(self.right)
+            print()
+        else:
+            indent += c
+            print(f"{' '*(indent-c)}╚{'═'*(c-1)}{node.root}")
+            if node.right and node.left:
+                self.print_tree(node.right, indent)
+                self.print_tree(node.left, indent)
+            elif node.left:
+                self.print_tree(node.left, indent)
+            else:
+                return
