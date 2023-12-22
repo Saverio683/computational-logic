@@ -6,6 +6,7 @@
 
 from typing import Optional, Sequence, Tuple, Union
 from dataclasses import dataclass
+import re
 
 def is_constant(string: str) -> bool:
     #le costanti sono lettere minuscole che vanno dalla 'a' alla 'e' o numeri
@@ -25,8 +26,8 @@ def is_equality(string: str) -> bool:
 
 def is_relation(string: str) -> bool:
     #verifica se la stringa è il nome di una relazione
-    #la stringa inizia con una maiuscola compresa tra 'F' e 'T' ed è alfanumerica
-    return string[0] >= 'F' and string[0] <= 'T' and string.isalnum()
+    #la stringa inizia con una maiuscola compresa tra 'F' e 'T'
+    return string[0] >= 'F' and string[0] <= 'T'
 
 def is_unary(string: str) -> bool:
     #verifico se è un operatore unario (NOT)
@@ -78,6 +79,24 @@ class Term:
             return parse_term(argument)
         #rimuovo l'ultimo carattere, che è una virgola in più
         return parse_term(self)[:-1]
+    
+    @staticmethod
+    def parse_term(string: str) -> 'Term':
+        if is_function(string[0]):
+            root, _, arguments = string.partition('(')
+            assert arguments[-1] == ')', f'Missing closing bracked in string: {arguments}'
+            arguments = re.split(r',(?![^()]*\))', arguments[:-1])
+            args = []
+            for arg in tuple(arguments):
+                args.append(Term.parse_term(arg))
+            #args = Term.parse_term(arguments[:-1])
+            return Term(root, tuple(args))
+        elif is_constant(string[0]) or is_variable(string[0]):
+            if len(string) == 1:
+                return Term(string)
+            assert False, f'Invalid string after constant/variable: {string[1:]}'
+        else:
+            assert False, f'Invalid term: {string}'
 @dataclass
 class Predicate:
     '''
@@ -155,11 +174,42 @@ class Predicate:
             return f'{Term.string_repr(node.arguments[0])}{node.root}{Term.string_repr(node.arguments[1], argument=node.arguments[1])}'
 
     def string_repr(self) -> str:
-        return '('+Predicate.__parse_predicate__(self)+')'
-
+        return f'({Predicate.__parse_predicate__(self)})'
+    
+    @staticmethod
+    def parse_predicate(string: str) -> 'Predicate':     
+        left, root, right = '', '', ''
+        for operator in ['&', '|', '->']:
+            if operator in string:
+                #l'espressione deve essere racchiusa da parentesi tonde   
+                assert string[0] == '(' and string[-1] == ')', 'String must start and end with round brackets'
+                left, root, right = string.partition(operator) 
+                return Predicate(root, Predicate.parse_predicate(left[1:]), Predicate.parse_predicate(right[:-1]))
+        if '~' in string:
+            _, root, left = string.partition('~')
+            return Predicate(root, Predicate.parse_predicate(left))
+        for quantifier in ['A', 'E']:
+            if quantifier in string:
+                _, root, right = string.partition(quantifier)
+                print()
+                assert right[1] == '[' and right[-1] == ']'
+                variable = right[0]
+                assert is_variable(variable), f'Invalid variable afer {root}: {right[0]}'
+                return Predicate(root, variable, Predicate.parse_predicate(right[2:-1]))
+        if '=' in string:
+            left, root, right = string.partition('=')
+            return Predicate(root, [Term.parse_term(left), Term.parse_term(right)])
+        elif is_relation(string):
+            root, _, right = string.partition('(')
+            args = []
+            for arg in re.split(r',(?![^()]*\))', right[:-1]):
+                args.append(Term.parse_term(arg))
+            return Predicate(root, args)
+        else:
+            return Term.parse_term(string)
 
 #f(g(x),3)
-my_term = Term('f', [Term('g', [Term('x')]), Term('3')])
+my_term = Term('sum', [Term('g', [Term('x')]), Term('3')])
 print(my_term.string_repr())
 #‘(Ex[f(g(x),3)=y]->GT(y,4))’
 my_predicate = Predicate('->',
@@ -170,3 +220,9 @@ my_predicate = Predicate('->',
 )
 
 print(my_predicate.string_repr())
+
+es = Term.parse_term('sum(g(x),3)')
+print(es.string_repr())
+
+es2 = Predicate.parse_predicate('(Ex[f(g(x),3)=y]->GT(y,4))')
+print(es2.string_repr())

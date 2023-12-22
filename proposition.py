@@ -76,7 +76,7 @@ class Proposition:
             return f'({self.left.string_repr()} {self.root} {self.right.string_repr()})'
 
     @staticmethod
-    def tokenize(expression: str) -> list[str]:
+    def __tokenize__(expression: str) -> list[str]:
         '''
         Questa funzione prende l'espressione e la divide in "token".
         Un token può essere una variabile, una costante, un operatore o una parentesi.
@@ -125,10 +125,10 @@ class Proposition:
         else:
             raise ValueError(f"Invalid token: {token}")
 
-    @classmethod
-    def render_tree(cls, expression: str) -> 'Proposition':
-        tokens = cls.tokenize(expression)
-        return cls.__build_tree__(tokens)
+    @staticmethod
+    def parse_proposition(expression: str) -> 'Proposition':
+        tokens = Proposition.__tokenize__(expression)
+        return Proposition.__build_tree__(tokens)
 
     def __is_model__(self, model: Model) -> bool:
         #Controlla se il dictionary passato è un modello logico su un set di variabili
@@ -217,7 +217,7 @@ class Proposition:
 
     def check_equivalence(self, string: str) -> bool:
         #controlla se la formula è equivalente alla formula passata come parametro
-        other_proposition = Proposition.render_tree(string)
+        other_proposition = Proposition.parse_proposition(string)
 
         #ricavo le variabili comuni tra le 2 formule, se hanno variabili diverse, non possono essere equivalenti
         common_variables = self.__get_variables__() & other_proposition.__get_variables__()

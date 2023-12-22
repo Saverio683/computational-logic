@@ -9,7 +9,7 @@ from proposition import Proposition
 #es = Proposition('&', Proposition('p'), Proposition('d'))
 #print(es.string_repr()) #(p & q)
 
-my_proposition = Proposition.render_tree('(( p & q ) | ~(q -> b))')
+my_proposition = Proposition.parse_proposition('(( p & q ) | ~(q -> b))')
 
 #print della tabella di verità
 my_proposition.print_truth_table()
