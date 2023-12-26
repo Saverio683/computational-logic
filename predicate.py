@@ -381,6 +381,8 @@ class Model(Generic[T]):
         argument n-tuple (of universe elements) to a universe element
         that the function is to output given these arguments.
         """
+        for el in universe:
+            constant_interpretations[str(el)] = el
         for constant in constant_interpretations:
             assert is_constant(constant)
             assert constant_interpretations[constant] in universe
@@ -431,7 +433,6 @@ class Model(Generic[T]):
         """
         # Check if the constants in the term are in the model's interpretations
         assert term.get_constants().issubset(self.constant_interpretations.keys())
-        
         # Check if the variables in the term are in the assignment
         assert term.get_variables().issubset(assignment.keys())
         
@@ -472,7 +473,7 @@ class Model(Generic[T]):
                 return left_value and right_value
             elif predicate.root == '|':
                 return left_value or right_value
-            else: #implica
+            else:  # implica
                 return not left_value or right_value
 
         elif is_quantifier(predicate.root):
@@ -480,21 +481,18 @@ class Model(Generic[T]):
             for element in self.universe:
                 new_assignment = dict(assignment)
                 new_assignment[variable] = element
-                if predicate.root == 'A':  # Quantificatore universale
-                    if not self.evaluate_predicate(predicate.statement, new_assignment):
-                        return False
-                elif predicate.root == 'E':  # Quantificatore esistenziale
-                    if self.evaluate_predicate(predicate.statement, new_assignment):
-                        return True
+                if self.evaluate_predicate(predicate.statement, new_assignment):
+                    return True
+            return False
 
         else:
             raise ValueError(f'Invalid predicate: {predicate.root}')
 
 
-'''
-Ex[(x = b & Ey[(y = plus(x, 1) & times(x, y) = a)])]
-Ex[((x=y & x=z) -> ~P(x,z))]
-(Ex[(G(y) & H(z))] -> I(w))
-Ex[(F(x) -> G(y, 4))]
-(Ex[(Q(x) & R(x))] -> (S(y) | T(z)))
-'''
+
+
+#Ex[(x = b & Ey[(y = plus(x, 1) & times(x, y) = a)])]
+#Ex[((x=y & x=z) -> ~P(x,z))]
+#(Ex[(G(y) & H(z))] -> I(w))
+#Ex[(F(x) -> G(y, 4))]
+#(Ex[(Q(x) & R(x))] -> (S(y) | T(z)))
