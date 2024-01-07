@@ -6,15 +6,16 @@
 
 from frozendict import frozendict
 from proposition import Proposition
-from predicate import Term, Predicate, Model
+from predicate import Predicate, Model
 
 #es = Proposition('&', Proposition('p'), Proposition('d'))
 #print(es.string_repr()) #(p & q)
-
-my_proposition = Proposition.parse_proposition('(( p & q ) | ~(q -> b))')
+#((p | q) & (r | s))
+my_proposition = Proposition.parse_proposition('((p & q) | ~(q -> b))')
 
 #print della tabella di verità
 my_proposition.print_truth_table()
+print(my_proposition.check_dnf_cnf())
 
 #tautologia, contraddizione, soddisfacibile
 t, c, s = my_proposition.is_tautology_contradiction_statisfiable()
@@ -52,7 +53,7 @@ my_model = Model(
             (1, 0): 0,
             (1, 1): 1
         },
-        'times': {
+        't': {
             (0, 0): 0,
             (0, 1): 0,
             (1, 0): 0,
@@ -69,19 +70,13 @@ my_model = Model(
     }
 )
 
-my_predicate = Predicate.parse_predicate('Ex[(x = a & Ey[(y = times(x, 1) & f(x, y) = b)])]')
-
 assignment = frozendict({
     'x': 1,
     'y': 0
 })
 
-#conversione da albero a stringa
+my_predicate = Predicate.parse_predicate('Ex[(x = b & Ey[(y = t(x, 1) & f(x, y) = a)])]')
 print(my_predicate.string_repr())
-
-my_term = Term.parse_term('f(g(b, 1), times(1, b))')
-result = my_model.evaluate_term(my_term, assignment)
-print(result)
 
 result = my_model.evaluate_predicate(my_predicate, assignment)
 print(result)

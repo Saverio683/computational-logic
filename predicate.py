@@ -3,6 +3,7 @@
 # pylint: disable=missing-function-docstring
 # pylint: disable=line-too-long
 # pylint: disable=trailing-whitespace
+# pylint: disable=pointless-string-statement
 
 from typing import AbstractSet, FrozenSet, Generic, Mapping, Optional, Sequence, Set, Tuple, TypeVar, Union
 from dataclasses import dataclass
@@ -18,7 +19,7 @@ def is_variable(string: str) -> bool:
     return string >= 'u' and string <= 'z'
 
 def is_function(string: str) -> bool:
-    #una funzione ha come prima lettera una minuscola che va dalla 'f' alla 't', è alfanumerica
+    #una funzione ha come prima lettera una minuscola che va dalla 'f' alla 't'
     return string[0] >= 'f' and string[0] <= 't' 
 
 def is_equality(string: str) -> bool:
@@ -35,8 +36,9 @@ def is_unary(string: str) -> bool:
     return string == '~'
 
 def is_binary(string: str) -> bool:
-    #in caso di AND e OR
+    #in caso di AND e OR e IMPLICA
     return string == '&' or string == '|' or string == '->'
+
 def is_quantifier(string: str) -> bool:
     #'A' rappresenta il 'per ogni', mentre 'E' indica 'esiste'
     return string == 'A' or string == 'E'
@@ -46,43 +48,44 @@ class Term:
     #Un albero i cui nodi possono essere variabili, costanti e funzioni
     root: str
     #Gli argomenti sono presenti SOLO SE il nodo è una funzione
-    arguments: Optional[Tuple['Term', ...]]
+    arguments: Optional[Tuple['Term', ...]] 
 
     def __init__(self, root: str, arguments: Optional[Tuple['Term']] = None):
-        if is_function(root):
+        if is_function(root): #verifico se il nodo è una funzione e nel caso verifico se possiede gli argomenti
             assert arguments is not None and len(arguments) > 0, 'Function requires arguments.'
             self.root = root
             self.arguments = tuple(arguments) if arguments else None
-        elif is_constant(root) or is_variable(root):
+        elif is_constant(root) or is_variable(root): #invece variabili e costanti non devono avere argomenti
             assert arguments is None, 'Constants and variables cannot have arguments.'
             self.root = root
             self.arguments = None   
         else:
-            raise ValueError(f'Invalid root string: {root}')
+            raise ValueError(f'Invalid string: {root}')
         
-    def __parse_term(self, node: 'Term') -> str:
+    #conversione da albero a stringa
+    def __get_string__(self, node: 'Term') -> str:
         if is_function(node.root):
-            args = ', '.join(self.__parse_term(arg) for arg in node.arguments)
+            #se è una funzione, si chiama il metodo in maniera ricorsiva per ogni suo argomento, separandoli da virgole
+            args = ', '.join(self.__get_string__(arg) for arg in node.arguments)
             return f'{node.root}({args})'
+        #se invece è una variabile/costante, si ritorna il suo valore
         return node.root
 
     def string_repr(self, argument: Optional['Term'] = None) -> str:
-        '''
-            converto l'albero in stringa.
-            la funzione parse_term è quella che costruisce la stringa lavorando nodo per nodo.
-            se il nodo è una funzione (quindi possiege gli argomenti), si concatena il suo valore 
-            con quello degli argomentim, iterandoli in maniera ricorsiva.
-            dopo che viene 'convertita' una funzione, si aggiunge una ',' che serve a dividere gli argomenti
-            se il nodo è una variabile/costante, si ritorna semplicemente il valore del nodo.
-        '''
         if argument:
-            return self.__parse_term(argument)
-        return self.__parse_term(self)
+            return self.__get_string__(argument)
+        return self.__get_string__(self)
     
+    #converto una stringa nel corrispettivo albero/oggetto
     @staticmethod
     def parse_term(string: str) -> 'Term':
         string = string.replace(' ', '')
-        if is_function(string[0]):
+        if is_function(string):
+            '''
+                nel caso di funzione, ad es "f(x,y)", root è "f" che è l'elemento a sinistra della parentesi "("
+                poi si verifica che le parentesi siano chiuse correttamente
+                poi si invoca la funzione ricorsiva sugli argomenti che sono separati da virgole
+            '''
             root, _, arguments = string.partition('(')
             assert arguments[-1] == ')', f'Missing closing bracked in string: {arguments}'
             arguments = re.split(r',(?![^()]*\))', arguments[:-1])
@@ -90,7 +93,7 @@ class Term:
             for arg in tuple(arguments):
                 args.append(Term.parse_term(arg))
             return Term(root, tuple(args))
-        elif is_constant(string[0]) or is_variable(string[0]):
+        elif is_constant(string[0]) or is_variable(string[0]):            
             if len(string) == 1:
                 return Term(string)
             raise ValueError(f'Invalid string after constant/variable: {string[1:]}')
@@ -128,7 +131,7 @@ class Term:
 
         def collect_functions(node: Term):
             if is_function(node.root):
-                #l'arietà di una funzione è il numero dei suoi argomenti
+                #l'arietà di una funzione è il numero dei suoi argomenti, questo valore servirà per i modelli
                 arity = len(node.arguments) if node.arguments else 0
                 functions_set.add((node.root, arity))
                 for arg in node.arguments:
@@ -140,9 +143,9 @@ class Term:
 class Predicate:
     '''
         'root' è il nodo dell'albero può essere una relazione/uguaglianza/operatore/quantificatore
-        'arguments' indica gli argomenti di root se è una relazione o un'uguaglianza
-        'left' e 'right' sono i sottonodi, nel caso se root è un operatore unario/binario
-        'variable' e 'statement' vengono assegnati se root è un quantificatore
+        'arguments' indica gli argomenti di root se è una relazione o un'uguaglianza, sennò è None
+        'left' e 'right' sono i sottonodi, nel caso se root è un operatore unario/binario, sennò sono None
+        'variable' e 'statement' vengono assegnati se root è un quantificatore, sennò sono None
     '''
     root: str
     arguments: Optional[Tuple[Term, ...]]
@@ -156,16 +159,16 @@ class Predicate:
         if root == '':
             self.root, self.arguments = '', None
         elif is_equality(root) or is_relation(root):
-            #verifico se arguments_or_left_or_variable È una sequenze e NON una stringa
+            #verifico se arguments_or_left_or_variable È una sequenza e NON una stringa
             assert isinstance(arguments_or_left_or_variable, Sequence) and \
             not isinstance(arguments_or_left_or_variable, str)
             if is_equality(root):
-                #Verifico se gli argomenti per l'uguale sono 2
+                #Verifico se gli argomenti sono esattamente 2, in caso di operatore di uguaglianza =
                 assert len(arguments_or_left_or_variable) == 2
             assert right_or_statement is None
             self.root, self.arguments = root, tuple(arguments_or_left_or_variable)
         elif is_unary(root):
-            # Verifico che solo il figlio sinistro esiste
+            # Verifico che solo il figlio sinistro esiste in caso di ~
             assert isinstance(arguments_or_left_or_variable, Predicate)
             assert right_or_statement is None
             self.root, self.first = root, arguments_or_left_or_variable
@@ -184,9 +187,15 @@ class Predicate:
             self.root, self.variable, self.statement = \
             root, arguments_or_left_or_variable, right_or_statement
 
+    #conversione dell'albero in stringa
     @staticmethod
     def __parse_predicate_tree__(node: 'Predicate') -> str:
         if is_binary(node.root):
+            '''
+                in caso di operatore binario, so per certezza che node.first è di tipo Predicate,
+                invece per node.second so solo che non è None.
+                Quindi devo vedere se è di tipo Term, Predicate o stringa
+            '''
             second = ''
             if isinstance(node.second, Term):
                 second = Term.string_repr(node.second)
@@ -198,6 +207,7 @@ class Predicate:
         elif is_unary(node.root):
             return f'{node.root} {node.__parse_predicate_tree__(node.first)}'
         elif is_quantifier(node.root):
+            #stesso procedimento fatto nel caso di operatore binario con node.second
             statement = ''
             if isinstance(node.statement, Term):
                 statement = Term.string_repr(node.statement)
@@ -210,17 +220,25 @@ class Predicate:
             args = ', '.join(Term.string_repr(arg) for arg in node.arguments)
             return f'{node.root}({args})'
         else:
+            #caso di operatore di uguaglianza, dove gli argomenti sono esattamente 2
             return f'{Term.string_repr(node.arguments[0], argument=node.arguments[0])} {node.root} {Term.string_repr(node.arguments[1], argument=node.arguments[1])}'
 
     def string_repr(self) -> str:
         return f'{Predicate.__parse_predicate_tree__(self)}'
     
+    #da stringa ad albero
     @staticmethod
     def parse_predicate(string: str) -> 'Predicate':  
+        #rimuovo gli spazi bianchi
         string = string.replace(' ', '')
+
         def find_outer_operator(string: str) -> list[int | None, bool]:
             """
-            Restituisce l'operatore più esterno nella stringa, tenendo conto delle precedenze delle parentesi.
+                Questo metodo trova l'operatore binario più esterno nella stringa, 
+                tenendo conto delle precedenze delle parentesi.
+                Ritorna l'indice dell'operatore e True se esso è '->', sennò false.
+                Serve sapere se l'operatore è in particolare '->' perché è composto da due caratteri
+                ad es. "(a & b) | c" ritorna l'indice dell'OR e false
             """
             open_count = 0
             stack = []
@@ -234,10 +252,10 @@ class Predicate:
                 elif i + 1 < len(string) and char + string[i + 1] == '->':
                     stack.append([i, open_count, True])
 
-            if not stack:
+            if not stack: #nessun operatore trovato
                 return None, False
 
-            min_value = float('inf')  # Inizializza con un valore molto grande
+            min_value = float('inf')# Inizializza con un valore molto grande
             min_element = None
 
             for el in stack:
@@ -251,15 +269,20 @@ class Predicate:
 
         if string == '':
             raise ValueError('Invalid empty string')
-        if string.endswith(']'):
+
+        if string.endswith(']'): #se finisce con ], allora si tratta di quantificatore
             for quantifier in ['A', 'E']:
                 if quantifier in string:
                     _, root, right = string.partition(quantifier)
-                    assert right[1] == '[' and right.endswith(']')
+                    #verifico che le parentesi sono state aperte correttamente
+                    assert right[1] == '[' and right.endswith(']') 
                     variable = right[0]
                     assert is_variable(variable), f'Invalid variable afer {root}: {right[0]}'
                     return Predicate(root, variable, Predicate.parse_predicate(right[2:-1]))
+
         left, root, right = '', '', ''
+
+        #caso di operatore binario
         if string.startswith('(') and string.endswith(')') and re.search(r'&|\||->', string):
             string = string[1:-1] #rimuovo le parentesi esterne
             index, is_implica  = find_outer_operator(string)
@@ -340,21 +363,16 @@ my_predicate = Predicate('->',
 
 T = TypeVar('T')
 class Model(Generic[T]):
-    """An immutable model for predicate-logic constructs.
-    Attributes:
-    universe: the set of elements to which terms can be evaluated and over
-    which quantifications are defined.
-    constant_interpretations: mapping from each constant name to the
-    universe element to which it evaluates.
-    relation_arities: mapping from each relation name to its arity, or to
-    ``-1`` if the relation is the empty relation.
-    relation_interpretations: mapping from each n-ary relation name to
-    argument n-tuples (of universe elements) for which the relation is
-    true.
-    function_arities: mapping from each function name to its arity.
-    function_interpretations: mapping from each n-ary function name to the
-    mapping from each argument n-tuple (of universe elements) to the
-    universe element that the function outputs given these arguments.
+    """
+    Classe del modello per i costrutti della logica dei predicati
+    ATTRIBUTI:
+    universe: il set di elementi in cui i termini possono essere valutati
+    e su cui sono definite le quantificazioni
+    constant_interpretations: mappatura da ogni nome di costante al suo valore
+    relation_arities: mappatura da ogni nome di relazione alla sua arità, se la relazione
+    è vuota allora l'arietà sarà -1.
+    relation_interpretations: mappatura da ogni nome di relazione ai suoi rispettivi output.
+    Lo stesso viene ripetuto per function_arities function_interpretations.
     """
     universe: FrozenSet[T]
     constant_interpretations: Mapping[str, T]
@@ -366,24 +384,16 @@ class Model(Generic[T]):
         constant_interpretations: Mapping[str, T],
         relation_interpretations: Mapping[str, AbstractSet[Tuple[T, ...]]],
         function_interpretations: Mapping[str, Mapping[Tuple[T, ...], T]] = frozendict()):
-        """Initializes a `Model` from its universe and constant, relation, and
-        function name interpretations.
-        Parameters:
-        universe: the set of elements to which terms are to be evaluated
-        and over which quantifications are to be defined.
-        constant_interpretations: mapping from each constant name to a
-        universe element to which it is to be evaluated.
-        relation_interpretations: mapping from each relation name that is to
-        be the name of an n-ary relation, to the argument n-tuples (of
-        universe elements) for which the relation is to be true.
-        function_interpretations: mapping from each function name that is to
-        be the name of an n-ary function, to a mapping from each
-        argument n-tuple (of universe elements) to a universe element
-        that the function is to output given these arguments.
-        """
         for el in universe:
+            '''
+            per ogni elemento dell'universo, associo a esso la corrispettiva costante
+            '''
             constant_interpretations[str(el)] = el
         for constant in constant_interpretations:
+            '''
+            verifico il corretto formato delle costanti e controllo se il loro valore 
+            appartiene all'universo
+            '''
             assert is_constant(constant)
             assert constant_interpretations[constant] in universe
         relation_arities = {}
@@ -391,17 +401,25 @@ class Model(Generic[T]):
             assert is_relation(relation)
             relation_interpretation = relation_interpretations[relation]
             if len(relation_interpretation) == 0:
-                arity = -1 # any
+                arity = -1
             else:
-                some_arguments = next(iter(relation_interpretation))
-                arity = len(some_arguments)
+                '''
+                some_arguments contiene il primo elemento di relation_interpretation,
+                some_arguments è la tupla contenente i valori dei parametri della relazione
+                questa variabile mi serve per calcolare l'arietà della relazione
+                '''
+                some_arguments = next(iter(relation_interpretation)) 
+                arity = len(some_arguments) #se ad esempio some_arguments è (0,0), l'arietà è 2
                 for arguments in relation_interpretation:
                     assert len(arguments) == arity
                     for argument in arguments:
-                        assert argument in universe
-            relation_arities[relation] = arity
+                        assert argument in universe #check se l'argomento esiste nell'insieme universo
+            relation_arities[relation] = arity #salvo l'arietà
         function_arities = {}
         for function in function_interpretations:
+            '''
+            il funzionamento è analogo per relation_interpretations
+            '''
             assert is_function(function)
             function_interpretation = function_interpretations[function]
             assert len(function_interpretation) > 0
@@ -415,6 +433,9 @@ class Model(Generic[T]):
                     assert argument in universe
                 assert function_interpretation[arguments] in universe
             function_arities[function] = arity
+        '''
+        Uso i tipi frozenset e frozendict per rendere gli attributi del modello immutabili
+        '''
         self.universe = frozenset(universe)
         self.constant_interpretations = frozendict(constant_interpretations)
         self.relation_arities = frozendict(relation_arities)
@@ -428,12 +449,11 @@ class Model(Generic[T]):
 
     def evaluate_term(self, term: Term, assignment: Mapping[str, T] = frozendict()) -> T:
         """
-        Calculates the value of the given term in the current model under the
-        given assignment of values to variable names.
+        Calcolo i valori di verità del termine con l'assegnazione dei nomi delle variabili
         """
-        # Check if the constants in the term are in the model's interpretations
+        # Verifico se le costanti nel termine sono nelle interpretazioni del modello
         assert term.get_constants().issubset(self.constant_interpretations.keys())
-        # Check if the variables in the term are in the assignment
+        # Verifico se le variabili del termine sono nell'assegnazione
         assert term.get_variables().issubset(assignment.keys())
         
         def evaluate_node(node: Term) -> T:
@@ -451,7 +471,7 @@ class Model(Generic[T]):
     
     def evaluate_predicate(self, predicate: Predicate, assignment: Mapping[str, T] = frozendict()) -> bool:
         """
-        Calcola il valore di verità del predicato dato nel modello attuale sotto l'assegnazione data.
+        Calcolo il valore di verità del predicato dato nel modello attuale sotto l'assegnazione data.
         """
         if is_equality(predicate.root):
             value1 = self.evaluate_term(predicate.arguments[0], assignment)
@@ -487,10 +507,6 @@ class Model(Generic[T]):
 
         else:
             raise ValueError(f'Invalid predicate: {predicate.root}')
-
-
-
-
 #Ex[(x = b & Ey[(y = plus(x, 1) & times(x, y) = a)])]
 #Ex[((x=y & x=z) -> ~P(x,z))]
 #(Ex[(G(y) & H(z))] -> I(w))

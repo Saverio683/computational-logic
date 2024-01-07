@@ -4,7 +4,7 @@
 # pylint: disable=line-too-long
 # pylint: disable=trailing-whitespace
 
-from typing import NewType, Optional, Tuple, Set, AbstractSet, Sequence, Iterable
+from typing import List, NewType, Optional, Tuple, Set, AbstractSet, Sequence, Iterable
 from dataclasses import dataclass
 from itertools import product
 from tabulate import tabulate
@@ -41,13 +41,13 @@ class Proposition:
         if self.__is_variable__(self.root):
             #il return è avvolto da graffe perché la funzione deve ritornare un set
             return {self.root} 
-        elif self.__is_unary__(self.root):
+        if self.__is_unary__(self.root):
             return self.left.__get_variables__()
-        elif self.__is_binary__(self.root):
+        if self.__is_binary__(self.root):
             #unisco le variabili di entrambi i rami, '|' è l'operatore UNIONE
             return self.left.__get_variables__() | self.right.__get_variables__()
-        else:
-            return set()
+
+        return set()
 
     def __get_operators__(self) -> Set[str]:
         #stessa cosa del metodo getVariables, ma con gli operatori
@@ -68,12 +68,13 @@ class Proposition:
         if self.__is_variable__(self.root):
             #ritorno il valore di root
             return self.root
-        elif self.__is_unary__(self.root):
+        if self.__is_unary__(self.root):
             #concateno il valore di root col ramo sinistro
             return f'{self.root}{self.left.string_repr()}'
-        elif self.__is_binary__(self.root):
+        if self.__is_binary__(self.root):
             #concateno il valore del nodo root e i due rami, con root al centro
             return f'({self.left.string_repr()} {self.root} {self.right.string_repr()})'
+        raise ValueError(f'invalid node: {self.root}')
 
     @staticmethod
     def __tokenize__(expression: str) -> list[str]:
@@ -91,10 +92,12 @@ class Proposition:
                     tokens.append(current_token)
                     current_token = ''
                 tokens.append(char)
-            elif char.isspace():
+            elif char.isspace() or (current_token and current_token[-1] in ['~', '&', '|', '->']):
                 if current_token:
                     tokens.append(current_token)
                     current_token = ''
+                if not char.isspace():
+                    current_token += char
             else:
                 current_token += char
         if current_token:
@@ -117,13 +120,13 @@ class Proposition:
             assert tokens.pop(0) == ')' #Verifico che le parentesi sono chiuse correttamente
             return cls(root=operator, left=left_sub_formula, right=right_sub_formula)
         #se non ci sono parentesi, allora ci può essere una variabile o un NOT
-        elif cls.__is_variable__(token):
+        if cls.__is_variable__(token):
             return cls(root=token)
-        elif cls.__is_unary__(token):
+        if cls.__is_unary__(token):
             sub_formula = cls.__build_tree__(tokens)
             return cls(root=token, left=sub_formula)
-        else:
-            raise ValueError(f"Invalid token: {token}")
+
+        raise ValueError(f"Invalid token: {token}")
 
     @staticmethod
     def parse_proposition(expression: str) -> 'Proposition':
@@ -161,21 +164,20 @@ class Proposition:
         if self.__is_variable__(self.root):
             #Se il nodo attuale è una variabile, ritorna il suo valore dal modello
             return model[self.root]
-        elif self.__is_unary__(self.root):
+        if self.__is_unary__(self.root):
             #In caso di operatore unario, cioè NOT, ritorna il not del suo nodo sottostante
             return not self.left.__evaluate_model__(model)
-        elif self.__is_binary__(self.root):
+        if self.__is_binary__(self.root):
             left_value = self.left.__evaluate_model__(model)
             right_value = self.right.__evaluate_model__(model)
-
         if self.root == '&':
             return left_value and right_value
-        elif self.root == '|':
+        if self.root == '|':
             return left_value or right_value
-        elif self.root == '->':
+        if self.root == '->':
             return (not left_value) or right_value
-        else:
-            raise ValueError(f"Invalid binary operator: {self.root}")
+
+        raise ValueError(f"Invalid binary operator: {self.root}")
         
     def __get_truth_values__(self) -> Iterable[bool]:
         #ritorna i valori di verità della formula
@@ -197,20 +199,45 @@ class Proposition:
         else:
             result = (False, False, True)
         return result
+    
+    def get_subexpressions(self) -> List[str]:
+        subexprs = []
+
+        if self.__is_variable__(self.root):
+            return [self.root]
+        if self.__is_unary__(self.root):
+            subexprs.extend(self.left.get_subexpressions())
+        elif self.__is_binary__(self.root):
+            subexprs.extend(self.left.get_subexpressions())
+            subexprs.extend(self.right.get_subexpressions())
+        
+        subexprs.append(self.string_repr())
+        return subexprs
 
     def print_truth_table(self):
-        #mostra a video la tabella di verità
         table = []
-        variables = self.__get_variables__()
-        headers = list(variables)
-        headers.append(self.string_repr())
+        variables = list(self.__get_variables__())
+        subexpressions = self.get_subexpressions()
+        
+        # Rimuovo le variabili dalla lista delle sottoespressioni
+        subexpressions = [expr for expr in subexpressions if expr not in variables]
+        
+        headers = variables + subexpressions
         colalign = ('center',) * len(headers)
+        
         models = self.__get_all_models__(variables)
-        truth_values = self.__get_truth_values__()
-        for (model, truth_value) in zip(models, truth_values):
-            row = list(model.values())
-            row.append(truth_value)
+        
+        for model in models:
+            row = [model[var] for var in variables]
+            
+            subexpr_values = {}
+            for subexpr in subexpressions:
+                subexpr_formula = Proposition.parse_proposition(subexpr)
+                subexpr_values[subexpr] = subexpr_formula.__evaluate_model__({var: model[var] for var in variables})
+            
+            row.extend([subexpr_values[subexpr] for subexpr in subexpressions])
             table.append(row)
+        
         print()
         print(tabulate(table, headers, tablefmt='heavy_outline', colalign=colalign))
         print()
@@ -251,3 +278,32 @@ class Proposition:
                 self.print_tree(node.left, indent)
             else:
                 return
+            
+    def check_dnf_cnf(self) -> Tuple[bool, bool]:
+
+        def check_clauses(node: 'Proposition', is_cnf: bool) -> bool:
+            if self.__is_binary__(node.root):
+                invalid_cnf_ops = ('&', '->')
+                invalid_dnf_ops = ('|', '->')
+                
+                if (is_cnf and node.root in invalid_cnf_ops) or (not is_cnf and node.root in invalid_dnf_ops):
+                    return False
+                
+                return check_clauses(node.left, is_cnf) and check_clauses(node.right, is_cnf)
+            
+            if self.__is_unary__(node.root):
+                if (is_cnf and node.root in ('&', '->')) or (not is_cnf and node.root in ('|', '->')):
+                    return False
+                return check_clauses(node.left, is_cnf)
+            
+            return True
+
+        is_cnf, is_dnf = False, False
+
+        if self.__is_binary__(self.root):
+            if self.root == '&':
+                is_cnf = check_clauses(self.left, True) and check_clauses(self.right, True)
+            elif self.root == '|':
+                is_dnf = check_clauses(self.left, False) and check_clauses(self.right, False)
+
+        return is_cnf, is_dnf
