@@ -5,7 +5,7 @@
 # pylint: disable=trailing-whitespace
 # pylint: disable=pointless-string-statement
 
-from typing import AbstractSet, FrozenSet, Generic, Mapping, Optional, Sequence, Set, Tuple, TypeVar, Union
+from typing import AbstractSet, FrozenSet, Generic, List, Mapping, Optional, Sequence, Set, Tuple, TypeVar, Union
 from dataclasses import dataclass
 import re
 from frozendict import frozendict
@@ -307,7 +307,15 @@ class Predicate:
             return Predicate(root, args)
         return Term.parse_term(string)
 
-    def get_all(self):
+    def get_all(self) -> Tuple[Set, Set, Set, Set, Set]:
+        '''
+            Ritorna:
+            -costanti
+            -variabili
+            -variabili legate
+            -funzioni
+            -relazioni
+        '''
         constants = set()
         functions = set()
         relations = set()
@@ -331,7 +339,8 @@ class Predicate:
                     find_everything(node.second)
             else:
                 if is_function(node.root):
-                    functions.add(node.root)
+                    arity = len(node.arguments) if node.arguments else 0
+                    functions.add((node.root, arity))
                     for arg in node.arguments:
                         find_everything(arg)
                 elif is_constant(node.root):
@@ -507,6 +516,43 @@ class Model(Generic[T]):
 
         else:
             raise ValueError(f'Invalid predicate: {predicate.root}')
+        
+    def is_model_of(self, formulas: List[Predicate], assignment: frozendict[str, int]) -> bool:
+        """
+        Verifica se il modello è un modello di ciascuna delle formule fornite.
+
+        Parametri:
+        - formulas: un set di formule da verificare
+
+        Ritorna:
+        - True se ogni formula è vera nel modello, sennò False
+        """
+        for formula in formulas:
+            #Check delle costanti, così come per funzioni e relazioni
+            if isinstance(formula, Term):
+                constants = formula.get_constants()
+                functions = formula.get_functions()
+                relations = ()
+            else:
+                (constants, _, __, functions, relations) = formula.get_all()
+            assert constants.issubset(self.constant_interpretations.keys())
+            
+            for function, arity in functions:
+                assert function in self.function_interpretations and self.function_arities[function] == arity
+            
+            for relation, arity in relations:
+                assert relation in self.relation_interpretations and self.relation_arities[relation] in {-1, arity}
+            
+            # Check della verità della formula nel modello
+            if isinstance(formula, Term):
+                result = self.evaluate_term(formula, assignment)
+            else:
+                result = self.evaluate_predicate(formula)
+            if not result:
+                return False
+        
+        return True
+
 #Ex[(x = b & Ey[(y = plus(x, 1) & times(x, y) = a)])]
 #Ex[((x=y & x=z) -> ~P(x,z))]
 #(Ex[(G(y) & H(z))] -> I(w))

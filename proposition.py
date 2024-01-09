@@ -280,6 +280,9 @@ class Proposition:
                 return
             
     def check_dnf_cnf(self) -> Tuple[bool, bool]:
+        '''
+        Ritorna i valori in ordine: CNF, DNF
+        '''
 
         def check_clauses(node: 'Proposition', is_cnf: bool) -> bool:
             if self.__is_binary__(node.root):

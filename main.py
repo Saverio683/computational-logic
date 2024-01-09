@@ -15,7 +15,14 @@ my_proposition = Proposition.parse_proposition('((p & q) | ~(q -> b))')
 
 #print della tabella di verità
 my_proposition.print_truth_table()
-print(my_proposition.check_dnf_cnf())
+
+result = my_proposition.check_dnf_cnf()
+if result[0]:
+    print("L'espressione è un CNF")
+elif result[1]:
+    print("L'espressione è un DNF")
+else:
+    print("L'espressione non è un CNF o un DNF")
 
 #tautologia, contraddizione, soddisfacibile
 t, c, s = my_proposition.is_tautology_contradiction_statisfiable()
@@ -28,55 +35,46 @@ print(f"L'espressione {E} {'è' if my_proposition.check_equivalence(E) else 'non
 
 my_proposition.print_tree()
 
-my_model = Model(
-    universe={0, 1},
-    constant_interpretations={
-        'a': 1,
-        'b': 0
-    },
-    function_interpretations={
+universe = {0, 1}
+constant_interpretations={'a': 1, 'b': 0}
+function_interpretations={
         'f': {
             (0, 0): 0,
             (0, 1): 1,
             (1, 0): 1,
             (1, 1): 0
         },
-        'plus': {
-            (0, 0): 1,
-            (0, 1): 0,
-            (1, 0): 0,
-            (1, 1): 1
-        },
         'g': {
-            (0, 0): 1,
-            (0, 1): 0,
-            (1, 0): 0,
-            (1, 1): 1
-        },
-        't': {
             (0, 0): 0,
             (0, 1): 0,
             (1, 0): 0,
             (1, 1): 1
         }
-    },
-    relation_interpretations={
-        'F': {
-            (0, 0): False,
-            (0, 1): True,
-            (1, 0): True,
-            (1, 1): False
-        }
     }
-)
+relation_interpretations={
+    'R': {
+        (0, 0): False,
+        (0, 1): True,
+        (1, 0): True,
+        (1, 1): False
+    }
+}
+my_model = Model(universe, constant_interpretations, relation_interpretations, function_interpretations)
 
 assignment = frozendict({
     'x': 1,
     'y': 0
 })
 
-my_predicate = Predicate.parse_predicate('Ex[(x = b & Ey[(y = t(x, 1) & f(x, y) = a)])]')
+f1 = Predicate.parse_predicate('Ex[(x = b & Ey[(y = g(x, 1) & f(x, y) = a)])]')
+f2 = Predicate.parse_predicate('f(1, x)')
+f3 = Predicate.parse_predicate('R(y, 0)')
+
+formulas = [f1, f2, f3]
+my_predicate = Predicate.parse_predicate('Ex[(x = b & Ey[(y = g(x, 1) & f(x, y) = a)])]')
 print(my_predicate.string_repr())
 
 result = my_model.evaluate_predicate(my_predicate, assignment)
+print(result)
+result = my_model.is_model_of(formulas, assignment)
 print(result)
