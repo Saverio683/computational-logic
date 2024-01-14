@@ -11,11 +11,20 @@ from tabulate import tabulate
 
 @dataclass
 class Proposition:
-    root: str
+    '''
+        Classe della fbf.
+        Parametri:
+            -root: il valore del nodo, può essere una variabile o un connettivo.
+            -left, right: altri nodi della classe Proposition, se root è un operatore unario, sarà presente
+            solo il parametro left, in caso di operatore binario sarà presente anche right.
+            Se root è una variabile, left e right saranno None.
+    '''
+    root: str #valore del nodo
     left: Optional['Proposition']
     right: Optional['Proposition']
 
-    Model = NewType('Model', dict[str, bool])
+    #tipo che definisce un'interpretazione
+    Model = NewType('Model', dict[str, bool]) 
 
     def __init__(self, root: str, left: Optional['Proposition'] = None, right: Optional['Proposition'] = None):
         self.root = root
@@ -24,20 +33,31 @@ class Proposition:
 
     @staticmethod
     def __is_variable__(string: str) -> bool:
-        #le variabili sono lettere minuscole che vanno dalla 'a' alla 'z', sono le foglie dell'albero
+        '''
+            Check se il valore del nodo è una variabile.
+            Le variabili sono lettere minuscole che vanno dalla 'a' alla 'z', sono le foglie dell'albero.
+        '''        
         return len(string) == 1 and 'a' <= string <= 'z'
 
     @staticmethod
     def __is_unary__(string: str) -> bool:
-        #operatori che hanno un solo ramo che sarà il sinistro, cioè il NOT
+        '''
+            Check se il valore del nodo è un operatore unario (NOT), indicato con il simbolo '~'.
+        '''  
         return string == '~'
 
     @staticmethod
     def __is_binary__(string: str) -> bool:
-        #operatori come AND, OR e IMPLICA
-        return string == '&' or string == '|' or string == '->'
+        '''
+            Check se il valore del nodo è un operatore binario (AND, OR, IMPLICA), indicati
+            con i rispettivi simboli '&', '|' e '->'.
+        ''' 
+        return string in ('&', '|', '->')
 
     def __get_variables__(self) -> Set[str]:
+        '''
+            Metodo che ritorna tutte le variabili della fbf.
+        '''
         if self.__is_variable__(self.root):
             #il return è avvolto da graffe perché la funzione deve ritornare un set
             return {self.root} 
@@ -46,25 +66,25 @@ class Proposition:
         if self.__is_binary__(self.root):
             #unisco le variabili di entrambi i rami, '|' è l'operatore UNIONE
             return self.left.__get_variables__() | self.right.__get_variables__()
-
-        return set()
+        return set() #nessuna variabile, ritorno un set vuoto
 
     def __get_operators__(self) -> Set[str]:
-        #stessa cosa del metodo getVariables, ma con gli operatori
+        '''
+            Metodo che ritorna tutti gli operatori della fbf.
+        '''
         operators = set()
-
         if self.__is_unary__(self.root) or self.__is_binary__(self.root):
             operators.add(self.root)
-
         if self.left:
             operators |= self.left.__get_operators__()
         if self.right:
             operators |= self.right.__get_operators__()
-
         return operators
 
-    #conversione dell'albero in stringa
-    def string_repr(self) -> str:
+    def string_repr(self) -> str: #inorder traversal
+        '''
+            Metodo che si occupa della conversione da albero in stringa (inorder traversal).
+        '''
         if self.__is_variable__(self.root):
             #ritorno il valore di root
             return self.root
@@ -79,10 +99,11 @@ class Proposition:
     @staticmethod
     def __tokenize__(expression: str) -> list[str]:
         '''
-        Questa funzione prende l'espressione e la divide in "token".
-        Un token può essere una variabile, una costante, un operatore o una parentesi.
-        Questa lista di token servirà poi per costruire l'albero
-        Ad es. (p & q) diventa ['(', 'p', '&', 'q', ')']
+            Questa funzione prende l'espressione e la divide in 'token'.
+            Un token è ogni elemento della stringa della fbf. Può essere una variabile, 
+            una costante, un operatore o una parentesi.
+            Questa lista di token servirà poi per costruire l'albero.
+            Ad es. passando in input '(p & q)', la funzione ritorna ['(', 'p', '&', 'q', ')'].
         '''
         tokens = []
         current_token = ''
@@ -92,6 +113,7 @@ class Proposition:
                     tokens.append(current_token)
                     current_token = ''
                 tokens.append(char)
+            #NB: considero anche il carattere precedente, poichè l'operatore IMPLICA è composto da due caratteri
             elif char.isspace() or (current_token and current_token[-1] in ['~', '&', '|', '->']):
                 if current_token:
                     tokens.append(current_token)
@@ -106,18 +128,24 @@ class Proposition:
 
     @classmethod
     def __build_tree__(cls, tokens: list) -> 'Proposition':
+        '''
+            Questo è il metodo che, preso l'output della funzione tokenize, interpreta i token passati per
+            derivarne l'albero, ritornando l'istanza della classe Proposition.
+        '''
         if not tokens:
             return Proposition('')
 
         #prendo il primo token della lista
         token = tokens.pop(0)
 
-        if token == '(': #se l'espressione iniza con '(', sicuramente c'è un operatore binario
+        if token == '(': #se l'espressione iniza con '(', sicuramente ci sarà un operatore binario, considerando che 
+            #si sta lavorando con le fbf, quindi va rispettato la corretta chiusura delle parentesi
             #quindi prendo le sotto-espressioni da destra e sinistra in maniera ricorsiva
             left_sub_formula = cls.__build_tree__(tokens)
             operator = tokens.pop(0)
             right_sub_formula = cls.__build_tree__(tokens)
-            assert tokens.pop(0) == ')' #Verifico che le parentesi sono chiuse correttamente
+            #Verifico che le parentesi sono chiuse correttamente
+            assert tokens.pop(0) == ')', 'Missing closing parenthesis'
             return cls(root=operator, left=left_sub_formula, right=right_sub_formula)
         #se non ci sono parentesi, allora ci può essere una variabile o un NOT
         if cls.__is_variable__(token):
@@ -125,42 +153,55 @@ class Proposition:
         if cls.__is_unary__(token):
             sub_formula = cls.__build_tree__(tokens)
             return cls(root=token, left=sub_formula)
-
-        raise ValueError(f"Invalid token: {token}")
+        raise ValueError(f'Invalid token: {token}')
 
     @staticmethod
     def parse_proposition(expression: str) -> 'Proposition':
+        '''
+            Metodo che converte la stringa di una fbf nel suo corrispettivo albero.
+            Così facendo, si può istanziare la classe Proposition senza invocare esplicitamente il costruttore.
+        '''
         tokens = Proposition.__tokenize__(expression)
         return Proposition.__build_tree__(tokens)
 
     def __is_model__(self, model: Model) -> bool:
-        #Controlla se il dictionary passato è un modello logico su un set di variabili
+        '''
+            Metodo che controlla se il dictionary passato è un modello valido.
+            Il controllo avviene verificando la sintasi delle sue variabili.
+        '''
         for key in model:
             if not self.__is_variable__(key):
                 return False
         return True
 
     def __get_model_variables__(self, model: Model) -> AbstractSet[str]:
-        #Ritorna tutte le variabili del modello
-        assert self.__is_model__(model) #se is_model ritorna false, l'assert emette un errore
+        '''
+            Metodo che ritorna le variabili di un modello.
+        '''
+        assert self.__is_model__(model), 'Invalid model'
         return model.keys()
 
     def __get_all_models__(self, variables: Sequence[str]) -> Iterable[Model]:
-        #ritorna tutte le combinazioni booleane delle variabili
+        '''
+            Metodo che ritorna tutte le combinazioni di verità.
+        '''        
         for v in variables: #check delle variabili
-            assert self.__is_variable__(v)
+            assert self.__is_variable__(v), f'Invalid variable: {v}'
 
         values = [False, True]
-        #product genera il prodotto cartesiano, aka tutte le possibili combinazioni
+        #product genera il prodotto cartesiano, ossia tutte le possibili combinazioni
         combinations = product(values, repeat=len(variables))
 
         for combination in combinations:
-            #con zip associo le variabili alle combinazioni booleane
+            #con zip 'associo' le variabili alle combinazioni booleane
             #con dict converto le coppie variabile-booleano in dictionary
-            #yield restituisce il dizionario appena creato
+            #yield restituisce il dizionario appena creato, pronto per essere iterato
             yield dict(zip(variables, combination))
 
     def __evaluate_model__(self, model: Model) -> bool:
+        '''
+            Associo i valori di verità alle variabili della fbf, iterando ogni nodo dell'albero.
+        '''
         if self.__is_variable__(self.root):
             #Se il nodo attuale è una variabile, ritorna il suo valore dal modello
             return model[self.root]
@@ -180,8 +221,10 @@ class Proposition:
         raise ValueError(f"Invalid binary operator: {self.root}")
         
     def __get_truth_values__(self) -> Iterable[bool]:
-        #ritorna i valori di verità della formula
-        #ad es. se l'espressione è (p & q), ritorna [False, False, False, True]
+        '''
+            Metodo che ritorna i valori di verità della fbf.
+            Ad es. se l'espressione è (p & q), ritorna [False, False, False, True].
+        '''
         variables = list(self.__get_variables__()) 
         models = self.__get_all_models__(variables)
 
@@ -189,18 +232,25 @@ class Proposition:
             yield self.__evaluate_model__(model)
 
     def is_tautology_contradiction_statisfiable(self) -> Tuple[bool, bool, bool]:
+        '''
+            Metodo che verifica le proprietà della fbf, ritorna 3 booleani che indicano rispettivamente
+            se la fbf è una tautologia, una contraddizione o se è soddisfacibile.
+        '''
         truth_values = self.__get_truth_values__()
         truth_values = list(truth_values)
         counter = truth_values.count(True)
-        if counter == 0:
+        if counter == 0: #contraddizione, nessun modello
             result = (False, True, False)
-        elif counter == len(truth_values):
+        elif counter == len(truth_values): #la fbf è valida, quindi una tautologia
             result = (True, False, False)
         else:
-            result = (False, False, True)
+            result = (False, False, True) #esiste almeno un modello, la fbf è soddisfacibile
         return result
     
     def get_subexpressions(self) -> List[str]:
+        '''
+            Metodo che ritorna le sottoformule della fbf.
+        '''
         subexprs = []
 
         if self.__is_variable__(self.root):
@@ -214,7 +264,10 @@ class Proposition:
         subexprs.append(self.string_repr())
         return subexprs
 
-    def print_truth_table(self):
+    def print_truth_table(self) -> None:
+        '''
+            Metodo che mostra a video la tabella di verità, valutando la fbf e le sue sottoformule.
+        '''
         table = []
         variables = list(self.__get_variables__())
         subexpressions = self.get_subexpressions()
@@ -229,12 +282,10 @@ class Proposition:
         
         for model in models:
             row = [model[var] for var in variables]
-            
             subexpr_values = {}
             for subexpr in subexpressions:
                 subexpr_formula = Proposition.parse_proposition(subexpr)
                 subexpr_values[subexpr] = subexpr_formula.__evaluate_model__({var: model[var] for var in variables})
-            
             row.extend([subexpr_values[subexpr] for subexpr in subexpressions])
             table.append(row)
         
@@ -243,7 +294,9 @@ class Proposition:
         print()
 
     def check_equivalence(self, string: str) -> bool:
-        #controlla se la formula è equivalente alla formula passata come parametro
+        '''
+            Metodo che verifica se la fbf è equivalente all'espressione passata in input.
+        '''
         other_proposition = Proposition.parse_proposition(string)
 
         #ricavo le variabili comuni tra le 2 formule, se hanno variabili diverse, non possono essere equivalenti
@@ -257,9 +310,12 @@ class Proposition:
             if self.__evaluate_model__(model) != other_proposition.__evaluate_model__(model):
                 return False
         return True
-    
-    def print_tree(self, node: Optional['Proposition'] = None, indent: int = 0):
-        c = 3
+
+    def print_tree(self, node: Optional['Proposition'] = None, indent: int = 0) -> None:
+        '''
+            Metodo che mostra a video l'albero della fbf.
+        '''
+        c = 3 #valore iniziale dell'indentazione, ad ogni nodo figlio questo valore aumenta
         if not node:
             print()
             print(self.root)
@@ -281,10 +337,14 @@ class Proposition:
             
     def check_dnf_cnf(self) -> Tuple[bool, bool]:
         '''
-        Ritorna i valori in ordine: CNF, DNF
+            Metodo che verifica se la fbf è un CNF o DNF.
+            Ritorna i valori booleani rispettivamente di: CNF, DNF.
         '''
 
         def check_clauses(node: 'Proposition', is_cnf: bool) -> bool:
+            '''
+                Metodo dove avviene effettivamente la verifica.
+            '''
             if self.__is_binary__(node.root):
                 invalid_cnf_ops = ('&', '->')
                 invalid_dnf_ops = ('|', '->')
@@ -310,3 +370,64 @@ class Proposition:
                 is_dnf = check_clauses(self.left, False) and check_clauses(self.right, False)
 
         return is_cnf, is_dnf
+
+    def get_equivalent_expression(self) -> str: 
+        '''
+            Questo metodo ritorna una fbf ridotta in forma normale, equivalente alla fbf 
+            di partenza.
+        '''
+        #duplico il self, così non modifico perennemente la proposizione di partenza ma ne genero una nuova
+        equivalent_expression = Proposition.parse_proposition(self.string_repr())
+        def replace_derivable_operators(node: Proposition) -> None:
+            '''
+                Questa funzione si occupa del primo step per ricavare una fbf equivalente in forma normale,
+                cioè rimuovere tutti gli operatori 'non-principali'.
+                \nIn questo caso l'unico operatore derivabile presente è l'operatore IMPLICA.
+                \nSe la fbf contiene questo operatore, viene modificata nella sua fbf equivalente.
+                Ad es. (q -> b) diventa (~q | b).
+            '''
+            if self.__is_binary__(node.root):
+                replace_derivable_operators(node.left)
+                replace_derivable_operators(node.right)
+                if node.root in ('->'):
+                    node.root = '|'
+                    node.left = Proposition.parse_proposition(f'~{node.left.string_repr()}')
+            elif self.__is_unary__(node.root):
+                replace_derivable_operators(node.left)
+        replace_derivable_operators(equivalent_expression)
+
+        def check_for_de_morgan_laws(node: Proposition) -> None:
+            '''
+                Questa funzione applica le leggi di de Morgan alla fbf.
+                \nOssia: 
+                    \n'~(P | Q)' è equivalente a '~P & ~Q'
+                    \n'~(P & Q)' è equivalente a '~P | ~Q'
+            '''
+            if self.__is_binary__(node.root):
+                check_for_de_morgan_laws(node.left)
+                check_for_de_morgan_laws(node.right)
+            elif self.__is_unary__(node.root):
+                if self.__is_binary__(node.left.root):
+                    #non si tiene conto dell'IMPLICA, poiché questa funzione viene eseguita dopo la precedente
+                    #che avrà già rimosso quel tipo di operatore
+                    new_root = '|' if node.left.root == '&' else '&'
+                    node.root = new_root
+                    node.right = Proposition.parse_proposition(f'~{node.left.right.string_repr()}')
+                    node.left = Proposition.parse_proposition(f'~{node.left.left.string_repr()}')
+
+        def check_for_double_negation(node: Proposition) -> None:
+            if self.__is_binary__(node.root):
+                check_for_double_negation(node.left)
+                check_for_double_negation(node.right)
+            elif self.__is_unary__(node.root):
+                if self.__is_unary__(node.left.root):
+                    copy = node.left.left
+                    node.root = copy.root
+                    node.left = copy.left
+                    node.right = copy.right
+                    check_for_double_negation(node)
+
+        check_for_de_morgan_laws(equivalent_expression)
+        check_for_double_negation(equivalent_expression)
+
+        return equivalent_expression.string_repr()

@@ -8,30 +8,25 @@ from frozendict import frozendict
 from proposition import Proposition
 from predicate import Predicate, Model
 
-#es = Proposition('&', Proposition('p'), Proposition('d'))
-#print(es.string_repr()) #(p & q)
+es = Proposition('&', Proposition('p'), Proposition('q'))
+#print(es.string_repr()) (p & q)
 #((p | q) & (r | s))
-my_proposition = Proposition.parse_proposition('((p & q) | ~(q -> b))')
+#my_proposition = Proposition.parse_proposition('((p & q) | (~q -> b))')
+my_proposition = Proposition.parse_proposition('((a | ~b) -> c)')
+print(f"L'espressione inserita è: {my_proposition.string_repr()}")
+
+#espressione equivalente ridotta in forma normale
+eq_ex = my_proposition.get_equivalent_expression()
+is_cnf, is_dnf = Proposition.parse_proposition(eq_ex).check_dnf_cnf()
+print(f"L'espressione equivalente ridotta in {'cnf' if is_cnf else 'dnf' } è: {eq_ex}")
 
 #print della tabella di verità
 my_proposition.print_truth_table()
-
-result = my_proposition.check_dnf_cnf()
-if result[0]:
-    print("L'espressione è un CNF")
-elif result[1]:
-    print("L'espressione è un DNF")
-else:
-    print("L'espressione non è un CNF o un DNF")
 
 #tautologia, contraddizione, soddisfacibile
 t, c, s = my_proposition.is_tautology_contradiction_statisfiable()
 R = 'tautologia' if t else 'contraddizione' if c else 'soddifacibile'
 print('Questa proposizione è ' + R)
-
-#equivalenza con un'altra espressione
-E = '(p | ~ p)'
-print(f"L'espressione {E} {'è' if my_proposition.check_equivalence(E) else 'non è'} equivalente")
 
 my_proposition.print_tree()
 
@@ -39,14 +34,14 @@ universe = {0, 1}
 constant_interpretations={'a': 1, 'b': 0}
 function_interpretations={
         'f': {
-            (0, 0): 0,
+            (0, 0): 1,
             (0, 1): 1,
-            (1, 0): 1,
+            (1, 0): 0,
             (1, 1): 0
         },
         'g': {
             (0, 0): 0,
-            (0, 1): 0,
+            (0, 1): 1,
             (1, 0): 0,
             (1, 1): 1
         }
