@@ -430,7 +430,36 @@ class Proposition:
                     node.right = copy.right
                     check_for_double_negation(node)
 
+        def check_for_distributivity(node: Proposition) -> None:
+            '''
+                Questo metodo applica la proprietà distributiva alla fbf per convertirla
+                in CNF o DNF.
+                Ad es. 'P & (Q | R)' diventa '(P & Q) | (Q & R)'.
+                Le variabili p rappresenterà
+            '''
+            if not self.__is_binary__(node.root):
+                return
+            
+            if self.__is_binary__(node.left.root):
+                p, q_and_r = node.left, node.right
+            elif self.__is_binary__(node.right.root):
+                p, q_and_r = node.right, node.left
+            else:
+                return
+            
+            if node.root == '&':
+                if q_and_r.root == '|':
+                    node.root = '|'
+                    node.left = Proposition.parse_proposition(f'({p.string_repr()} & {q_and_r.left.string_repr()})')
+                    node.right = Proposition.parse_proposition(f'({p.string_repr()} & {q_and_r.right.string_repr()})')
+            else:
+                if q_and_r.root == '&':
+                    node.root = '&'
+                    node.left = Proposition.parse_proposition(f'({p.string_repr()} | {q_and_r.left.string_repr()})')
+                    node.right = Proposition.parse_proposition(f'({p.string_repr()} | {q_and_r.right.string_repr()})')
+
         check_for_de_morgan_laws(equivalent_expression)
         check_for_double_negation(equivalent_expression)
+        check_for_distributivity(equivalent_expression)
 
         return equivalent_expression.string_repr()

@@ -8,17 +8,19 @@ from frozendict import frozendict
 from proposition import Proposition
 from predicate import Predicate, Model
 
-es = Proposition('&', Proposition('p'), Proposition('q'))
-#print(es.string_repr()) (p & q)
-#((p | q) & (r | s))
-#my_proposition = Proposition.parse_proposition('((p & q) | (~q -> b))')
-my_proposition = Proposition.parse_proposition('((a | ~b) -> c)')
+#es = Proposition('&', Proposition('p'), Proposition('q'))
+#print(es.string_repr()) #(p & q)
+#((p & q) | (~q -> b)); ((a | ~b) -> c)
+my_proposition = Proposition.parse_proposition('(~(a & ~b) & c)')
 print(f"L'espressione inserita è: {my_proposition.string_repr()}")
 
 #espressione equivalente ridotta in forma normale
 eq_ex = my_proposition.get_equivalent_expression()
 is_cnf, is_dnf = Proposition.parse_proposition(eq_ex).check_dnf_cnf()
-print(f"L'espressione equivalente ridotta in {'cnf' if is_cnf else 'dnf' } è: {eq_ex}")
+print(f"L'espressione equivalente ridotta in {'cnf' if is_cnf else 'dnf' if is_dnf else 'forma normale' } è: {eq_ex}")
+
+#doppio check se effettivamente sono equivalenti
+print(my_proposition.check_equivalence(eq_ex))
 
 #print della tabella di verità
 my_proposition.print_truth_table()
