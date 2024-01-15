@@ -416,6 +416,9 @@ class Proposition:
                     node.left = Proposition.parse_proposition(f'~{node.left.left.string_repr()}')
 
         def check_for_double_negation(node: Proposition) -> None:
+            '''
+                Verifica se ci sono due NOT in successione nell'albero, annullandoli.
+            '''
             if self.__is_binary__(node.root):
                 check_for_double_negation(node.left)
                 check_for_double_negation(node.right)

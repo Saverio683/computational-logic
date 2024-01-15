@@ -122,6 +122,9 @@ class Term:
             '''
             root, _, arguments = string.partition('(')
             assert arguments[-1] == ')', f'Missing closing bracked in string: {arguments}'
+            #questo regex suddivide separa gli argomenti. Gli argomenti sono separati da virgole.
+            #Il regex tiene anche conto degli argomenti tra parentesi, che vengono considerati un unico argomento
+            #Ad es. 'a,b,(c,d),e' viene suddivisa in 'a', 'b', '(c,d)', 'e'
             arguments = re.split(r',(?![^()]*\))', arguments[:-1])
             args = []
             for arg in tuple(arguments):
@@ -335,6 +338,7 @@ class Predicate:
         left, root, right = '', '', ''
 
         #caso di operatore binario
+        #il regex sottostante cerca i 3 operatori binari nella stringa
         if string.startswith('(') and string.endswith(')') and re.search(r'&|\||->', string):
             string = string[1:-1] #rimuovo le parentesi esterne
             index, is_implica  = find_outer_operator(string)
@@ -354,6 +358,8 @@ class Predicate:
         if is_relation(string):
             root, _, right = string.partition('(')
             args = []
+            #il regex individua gli argomenti separati da virgole, tenendo sempre conto di quelli
+            #all'interno delle parentesi, considerandoli come un unico argomento
             for arg in re.split(r',(?![^()]*\))', right[:-1]):
                 args.append(Term.parse_term(arg))
             return Predicate(root, args)
