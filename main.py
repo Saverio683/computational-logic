@@ -20,7 +20,7 @@ is_cnf, is_dnf = Proposition.parse_proposition(eq_ex).check_dnf_cnf()
 print(f"L'espressione equivalente ridotta in {'cnf' if is_cnf else 'dnf' if is_dnf else 'forma normale' } è: {eq_ex}")
 
 #doppio check se effettivamente sono equivalenti
-print(my_proposition.check_equivalence(eq_ex))
+#print(my_proposition.check_equivalence(eq_ex))
 
 #print della tabella di verità
 my_proposition.print_truth_table()
@@ -28,10 +28,11 @@ my_proposition.print_truth_table()
 #tautologia, contraddizione, soddisfacibile
 t, c, s = my_proposition.is_tautology_contradiction_statisfiable()
 R = 'tautologia' if t else 'contraddizione' if c else 'soddifacibile'
-print('Questa proposizione è ' + R)
+print('Questa fbf è ' + R)
 
 my_proposition.print_tree()
 
+#dominio
 universe = {0, 1}
 constant_interpretations={'a': 1, 'b': 0}
 function_interpretations={
@@ -56,8 +57,10 @@ relation_interpretations={
         (1, 1): False
     }
 }
+#struttura
 my_model = Model(universe, constant_interpretations, relation_interpretations, function_interpretations)
 
+#ambiente
 assignment = frozendict({
     'x': 1,
     'y': 0
@@ -67,11 +70,10 @@ f1 = Predicate.parse_predicate('Ex[(x = b & Ey[(y = g(x, 1) & f(x, y) = a)])]')
 f2 = Predicate.parse_predicate('f(1, x)')
 f3 = Predicate.parse_predicate('R(y, 0)')
 
-formulas = [f1, f2, f3]
 my_predicate = Predicate.parse_predicate('Ex[(x = b & Ey[(y = g(x, 1) & f(x, y) = a)])]')
 print(my_predicate.string_repr())
 
 result = my_model.evaluate_predicate(my_predicate, assignment)
 print(result)
-result = my_model.is_model_of(formulas, assignment)
+result = my_model.is_model_of([f1, f2], assignment)
 print(result)

@@ -15,14 +15,14 @@ def is_constant(string: str) -> bool:
         Check se la stringa passata in input è una costante.
         Le costanti sono lettere minuscole che vanno dalla 'a' alla 'e' o numeri.
     '''
-    return  'a' <= string <= 'e' or string.isdigit()
+    return 'a' <= string <= 'e' or string.isdigit()
 
 def is_variable(string: str) -> bool:
     '''
         Check se la stringa passata in input è una variabile.
         Le variabili sono rappresentate da lettere minuscole dalla 'u' alla 'z'.
     '''
-    return string >= 'u' and string <= 'z'
+    return 'u' <= string <= 'z'
 
 def is_function(string: str) -> bool:
     '''
@@ -74,7 +74,7 @@ class Term:
     '''
     root: str
     #Gli argomenti sono presenti SE E SOLO SE il nodo è una funzione
-    arguments: Optional[Tuple['Term', ...]] 
+    arguments: Optional[Tuple['Term', ...]]
 
     def __init__(self, root: str, arguments: Optional[Tuple['Term']] = None):
         if is_function(root): #verifico se il nodo è una funzione e nel caso verifico se possiede gli argomenti
@@ -88,13 +88,13 @@ class Term:
         else:
             raise ValueError(f'Invalid string: {root}')
         
-    def __get_string__(self, node: 'Term') -> str:
+    def _get_string_(self, node: 'Term') -> str:
         '''
             Metodo che converte l'albero nella sua corrispettiva espressione
         '''
         if is_function(node.root):
             #se è una funzione, si chiama il metodo in maniera ricorsiva su ogni suo argomento, separandoli da virgole
-            args = ', '.join(self.__get_string__(arg) for arg in node.arguments)
+            args = ', '.join(self._get_string_(arg) for arg in node.arguments)
             return f'{node.root}({args})'
         #se invece è una variabile/costante, si ritorna il suo valore
         return node.root
@@ -104,9 +104,8 @@ class Term:
             Metodo che converte l'intero albero in stringa
         '''
         if argument:
-            return self.__get_string__(argument)
-        return self.__get_string__(self)
-    
+            return self._get_string_(argument)
+        return self._get_string_(self)
 
     @staticmethod
     def parse_term(string: str) -> 'Term':
@@ -125,6 +124,7 @@ class Term:
             #questo regex suddivide separa gli argomenti. Gli argomenti sono separati da virgole.
             #Il regex tiene anche conto degli argomenti tra parentesi, che vengono considerati un unico argomento
             #Ad es. 'a,b,(c,d),e' viene suddivisa in 'a', 'b', '(c,d)', 'e'
+
             arguments = re.split(r',(?![^()]*\))', arguments[:-1])
             args = []
             for arg in tuple(arguments):
@@ -144,7 +144,7 @@ class Term:
         constants_set = set()
 
         def collect_constants(node: Term):
-            if is_constant(node.root):
+            if is_constant(node.root): 
                 constants_set.add(node.root)
             elif is_function(node.root):
                 for arg in node.arguments:
@@ -179,7 +179,7 @@ class Term:
         def collect_functions(node: Term):
             if is_function(node.root):
                 #l'arietà di una funzione è il numero dei suoi argomenti
-                arity = len(node.arguments) if node.arguments else 0
+                arity = len(node.arguments)
                 functions_set.add((node.root, arity))
                 for arg in node.arguments:
                     collect_functions(arg)
@@ -237,7 +237,7 @@ class Predicate:
             root, arguments_or_left_or_variable, right_or_statement
 
     @staticmethod
-    def __parse_predicate_tree__(node: 'Predicate') -> str:
+    def parse_predicate_tree(node: 'Predicate') -> str:
         '''
             Metodo che converte l'albero nella corrispettiva stringa.
         '''
@@ -251,19 +251,19 @@ class Predicate:
             if isinstance(node.second, Term):
                 second = Term.string_repr(node.second)
             elif isinstance(node.second, Predicate):
-                second = node.__parse_predicate_tree__(node.second)
+                second = node.parse_predicate_tree(node.second)
             elif isinstance(node.second, str):
                 second = node.second
-            return f'({node.__parse_predicate_tree__(node.first)} {node.root} {second})'
+            return f'({node.parse_predicate_tree(node.first)} {node.root} {second})'
         if is_unary(node.root):
-            return f'{node.root} {node.__parse_predicate_tree__(node.first)}'
+            return f'{node.root} {node.parse_predicate_tree(node.first)}'
         if is_quantifier(node.root):
             #stesso procedimento fatto nel caso di operatore binario con node.second
             statement = ''
             if isinstance(node.statement, Term):
                 statement = Term.string_repr(node.statement)
             elif isinstance(node.statement, Predicate):
-                statement = node.__parse_predicate_tree__(node.statement)
+                statement = node.parse_predicate_tree(node.statement)
             elif isinstance(node.statement, str):
                 statement = node.statement
             return f'{node.root}{node.variable}[{statement}]'
@@ -277,7 +277,7 @@ class Predicate:
         '''
             Metodo che converte l'albero in stringa.
         '''
-        return Predicate.__parse_predicate_tree__(self)
+        return Predicate.parse_predicate_tree(self)
     
     @staticmethod
     def parse_predicate(string: str) -> 'Predicate': 
@@ -286,6 +286,9 @@ class Predicate:
         ''' 
         #rimuovo gli spazi bianchi
         string = string.replace(' ', '')
+
+        if string == '':
+            raise ValueError('Invalid empty string')
 
         def find_outer_operator(string: str) -> list[int | None, bool]:
             '''
@@ -317,13 +320,8 @@ class Predicate:
                 if el[1] < min_value:
                     min_value = el[1]
                     min_element = el
-
-            if min_element[2]:
-                return min_element[0], True
-            return min_element[0], False
-
-        if string == '':
-            raise ValueError('Invalid empty string')
+        
+            return min_element[0], min_element[2]
 
         if string.endswith(']'): #se finisce con ], allora si tratta di quantificatore
             for quantifier in ['A', 'E']:
@@ -343,8 +341,8 @@ class Predicate:
             string = string[1:-1] #rimuovo le parentesi esterne
             index, is_implica  = find_outer_operator(string)
             assert index is not None
-            left = string[0:index]
             root_length = 2 if is_implica else 1
+            left = string[0:index]
             root = string[index:index + root_length]
             right = string[index + root_length:]
             return Predicate(root, Predicate.parse_predicate(left), Predicate.parse_predicate(right))
@@ -384,7 +382,10 @@ class Predicate:
             if isinstance(node, Predicate):
                 if is_relation(node.root) or is_equality(node.root):
                     if is_relation(node.root):
-                        relations.add(node.root)
+                        arity = len(node.arguments) if node.arguments else 0
+                        relations.add((node.root, arity))
+                        for arg in node.arguments:
+                            find_everything(arg)
                     for arg in node.arguments:
                         find_everything(arg)
                 elif is_quantifier(node.root):
@@ -427,7 +428,7 @@ my_predicate = Predicate('->',
     Predicate('GT', [Term('y'), Term('4')])
 ) """
 
-
+#tipo generico
 T = TypeVar('T')
 class Model(Generic[T]):
     """
@@ -580,7 +581,7 @@ class Model(Generic[T]):
                 functions = formula.get_functions()
                 relations = ()
             else:
-                (constants, _, __, functions, relations) = formula.get_all()
+                (constants, _, _, functions, relations) = formula.get_all()
             assert constants.issubset(self.constant_interpretations.keys())
             
             for function, arity in functions:
@@ -593,7 +594,7 @@ class Model(Generic[T]):
             if isinstance(formula, Term):
                 result = self.evaluate_term(formula, assignment)
             else:
-                result = self.evaluate_predicate(formula)
+                result = self.evaluate_predicate(formula, assignment)
             if not result:
                 return False
         
