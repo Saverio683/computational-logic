@@ -272,12 +272,6 @@ class Predicate:
             return f'{node.root}({args})'
         #caso di operatore di uguaglianza, dove gli argomenti sono esattamente 2
         return f'{Term.string_repr(node.arguments[0], argument=node.arguments[0])} {node.root} {Term.string_repr(node.arguments[1], argument=node.arguments[1])}'
-
-    def string_repr(self) -> str:
-        '''
-            Metodo che converte l'albero in stringa.
-        '''
-        return Predicate.parse_predicate_tree(self)
     
     @staticmethod
     def parse_predicate(string: str) -> 'Predicate': 
@@ -363,6 +357,12 @@ class Predicate:
             return Predicate(root, args)
         return Term.parse_term(string)
 
+    def string_repr(self) -> str:
+        '''
+            Metodo che converte l'albero in stringa.
+        '''
+        return Predicate.parse_predicate_tree(self)    
+
     def get_all(self) -> Tuple[Set, Set, Set, Set, Set]:
         '''
             Ritorna nell'ordine:\n
@@ -415,18 +415,6 @@ class Predicate:
             functions,
             relations
         )
-
-#f(g(x),3)
-#my_term = Term('sum', [Term('g', [Term('x')]), Term('3')])
-
-#‘(Ex[f(g(x),3)=y]->GT(y,4))’
-""" 
-my_predicate = Predicate('->',
-    Predicate('E', 'x',
-        Predicate('=', [my_term, Term('y')])
-    ),
-    Predicate('GT', [Term('y'), Term('4')])
-) """
 
 #tipo generico
 T = TypeVar('T')
