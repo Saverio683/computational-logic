@@ -52,7 +52,7 @@ class Proposition:
             Check se il valore del nodo è un operatore binario (AND, OR, IMPLICA), indicati
             con i rispettivi simboli '&', '|' e '->'.
         ''' 
-        return string in ('&', '|', '->')
+        return string in ('&', '|', '->', '@')
 
     def get_variables(self) -> Set[str]:
         '''
@@ -116,7 +116,7 @@ class Proposition:
                     current_token = ''
                 tokens.append(char)
             #NB: considero anche il carattere precedente, poichè l'operatore IMPLICA è composto da due caratteri
-            elif char.isspace() or (current_token and current_token[-1] in ['~', '&', '|', '->']):
+            elif char.isspace() or (current_token and current_token[-1] in ['~', '&', '|', '->', '@']):
                 if current_token:
                     tokens.append(current_token)
                     current_token = ''
@@ -219,6 +219,8 @@ class Proposition:
             return left_value or right_value
         if self.root == '->':
             return (not left_value) or right_value
+        if self.root == '@':
+            return not left_value == right_value
 
         raise ValueError(f'Invalid binary operator: {self.root}')
         

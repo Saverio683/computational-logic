@@ -10,13 +10,16 @@ from predicate import Predicate, Model
 
 #es = Proposition('&', Proposition('p'), Proposition('q'))
 #print(es.string_repr()) #(p & q)
-my_proposition = Proposition.parse_proposition('(~(a & ~b) & c)')
+#my_proposition = Proposition.parse_proposition('(~(a & ~b) & c)')
+my_proposition = Proposition.parse_proposition('(a @ (d -> ~b))')
 print(f"L'espressione inserita è: {my_proposition.string_repr()}")
 
 #espressione equivalente ridotta in forma normale
 eq_ex = my_proposition.get_equivalent_expression()
 is_cnf, is_dnf = Proposition.parse_proposition(eq_ex).check_dnf_cnf()
 print(f"L'espressione equivalente ridotta in {'cnf' if is_cnf else 'dnf' if is_dnf else 'forma normale' } è: {eq_ex}")
+
+#Proposition.parse_proposition(eq_ex).print_truth_table()
 
 #print della tabella di verità
 my_proposition.print_truth_table()
@@ -66,6 +69,8 @@ assignment = frozendict({
 
 my_predicate = Predicate.parse_predicate('Ex[(x = b & Ey[(y = g(x, z) & f(x, y) = a)])]')
 print(my_predicate.string_repr())
+
+print(my_predicate.get_all())
 
 #interpretazione
 result = my_model.evaluate_predicate(my_predicate, assignment)
